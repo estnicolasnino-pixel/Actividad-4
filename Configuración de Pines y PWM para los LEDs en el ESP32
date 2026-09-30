@@ -1,0 +1,75 @@
+import machine
+import sys
+import uselect
+import time
+
+# ------------------------------------------------------------------
+# Configuración de Pines y PWM para los LEDs en el ESP32
+# Ajusta los números de GPIO según las conexiones físicas de tu circuito
+# ------------------------------------------------------------------
+PIN_YELLOW = 12
+PIN_BLUE   = 13
+PIN_RED    = 14
+
+led_yellow = machine.PWM(machine.Pin(PIN_YELLOW), freq=1000)
+led_blue   = machine.PWM(machine.Pin(PIN_BLUE), freq=1000)
+led_red    = machine.PWM(machine.Pin(PIN_RED), freq=1000)
+
+leds = [led_yellow, led_blue, led_red]
+
+def set_brightness(percentage):
+    """ Ajusta la intensidad de todos los LEDs (PWM de 0 a 1023) """
+    duty_val = int((percentage / 100.0) * 1023)
+    for led in leds:
+        led.duty(duty_val)
+
+def turn_off():
+    for led in leds:
+        led.duty(0)
+
+def sequence_mode_1():
+    """ Primera Interrupción (Thumb_Down): Secuencia Modo 1 """
+    turn_off()
+    for _ in range(4):
+        for led in leds:
+            led.duty(1023)
+            time.sleep(0.15)
+            led.duty(0)
+
+def sequence_mode_2():
+    """ Segunda Interrupción (Thumb_Up): Secuencia Modo 2 """
+    turn_off()
+    for _ in range(5):
+        set_brightness(100)
+        time.sleep(0.1)
+        set_brightness(0)
+        time.sleep(0.1)
+
+# Configuración de recepción serial
+poll_obj = uselect.poll()
+poll_obj.register(sys.stdin, uselect.POLLIN)
+
+set_brightness(0)
+print("ESP32 listo para recibir comandos seriales...")
+
+while True:
+    if poll_obj.poll(10):  # Revisa si llegó un dato por serial
+        cmd = sys.stdin.read(1)
+        
+        if cmd == '1':
+            print("Acción -> 30% Intensidad")
+            set_brightness(30)
+        elif cmd == '2':
+            print("Acción -> 70% Intensidad")
+            set_brightness(70)
+        elif cmd == '3':
+            print("Acción -> 100% Intensidad")
+            set_brightness(100)
+        elif cmd == '4':
+            print("Acción -> Secuencia Modo 1")
+            sequence_mode_1()
+        elif cmd == '5':
+            print("Acción -> Secuencia Modo 2")
+            sequence_mode_2()
+
+    time.sleep(0.01)
